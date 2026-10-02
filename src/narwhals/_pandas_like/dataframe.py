@@ -505,6 +505,20 @@ class PandasLikeDataFrame(
         columns = self._evaluate_exprs(*exprs)
         if not columns and len(self) == 0:
             return self
+        if (
+            self.shape == (0, 0)
+            and (
+                anchor := next((s for s in columns if not s._broadcast and len(s)), None)
+            )
+            is not None
+        ):
+            frame = self._with_native(type(self.native)(index=anchor.native.index))
+            namespace = self.__narwhals_namespace__()
+            df = namespace._concat_by_index(
+                [frame._extract_comparand(s) for s in columns]
+            )
+            df.columns.name = self.native.columns.name
+            return self._with_native(df)
         name_columns: dict[str, PandasLikeSeries] = {s.name: s for s in columns}
         to_concat = []
         # Make sure to preserve column order
